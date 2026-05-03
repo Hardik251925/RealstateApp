@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PropTrade</title>
+  <meta http-equiv="refresh" content="0; url=login.html">
+  <script>
+    // Try go straight to market if logged in
+    try {
+      const sess = JSON.parse(localStorage.getItem('pt_session') || 'null');
+      if (sess && sess.user_id) {
+        location.replace('market.html');
+      } else {
+        location.replace('login.html');
+      }
+    } catch {
+      location.replace('login.html');
+    }
+  </script>
+</head>
+<body>
+  <p>Redirecting to <a href="login.html">PropTrade</a>...</p>
+</body>
+</html>

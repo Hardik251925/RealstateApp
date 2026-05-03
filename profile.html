@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile — PropTrade</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="siteHeader"></div>
+<main class="main">
+  <div class="page-head">
+    <h1 class="page-h1">My Profile</h1>
+    <p class="page-sub">Account aur KYC details</p>
+  </div>
+  <div id="profileContent"></div>
+</main>
+
+<script src="js/data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/main.js"></script>
+<script>
+const user = requireAuth();
+if (user) {
+  renderHeader('market');
+  const orderCount = Store.getOrders(user.id).length;
+  const holdingCount = Store.getHoldings(user.id).length;
+
+  document.getElementById('profileContent').innerHTML = `
+    <div class="profile-grid">
+      <div class="card profile-card">
+        <div class="profile-avatar-lg">${user.full_name[0].toUpperCase()}</div>
+        <div class="profile-name">${escapeHTML(user.full_name)}</div>
+        <div class="profile-email">${escapeHTML(user.email)}</div>
+        <div class="profile-phone">📱 ${escapeHTML(user.phone)}</div>
+        <div class="kyc-status">
+          <span class="kyc-label">KYC Status</span>
+          <span class="kyc-pill ${user.kyc_status === 'VERIFIED' ? 'verified' : 'pending'}">
+            ${user.kyc_status === 'VERIFIED' ? '✓ Verified' : '⏱ Pending (Demo)'}
+          </span>
+        </div>
+      </div>
+
+      <div class="profile-stats">
+        <div class="ps-card"><div class="ps-label">Total Orders</div><div class="ps-value">${orderCount}</div></div>
+        <div class="ps-card"><div class="ps-label">Active Holdings</div><div class="ps-value">${holdingCount}</div></div>
+        <div class="ps-card"><div class="ps-label">Wallet Balance</div><div class="ps-value">${formatINR(user.wallet_balance)}</div></div>
+        <div class="ps-card"><div class="ps-label">Member Since</div><div class="ps-value">${user.created_at.slice(0,10)}</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3 class="card-title">Account Information</h3></div>
+      <div class="card-body info-list">
+        <div class="info-row"><div class="info-label">Full Name</div><div class="info-value">${escapeHTML(user.full_name)}</div></div>
+        <div class="info-row"><div class="info-label">Email Address</div><div class="info-value">${escapeHTML(user.email)}</div></div>
+        <div class="info-row"><div class="info-label">Phone Number</div><div class="info-value">${escapeHTML(user.phone)}</div></div>
+        <div class="info-row"><div class="info-label">PAN Number</div><div class="info-value">${user.pan || 'Not provided (Demo)'}</div></div>
+        <div class="info-row"><div class="info-label">KYC Status</div><div class="info-value">${user.kyc_status}</div></div>
+        <div class="info-row"><div class="info-label">Account Type</div><div class="info-value">Demo Account</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3 class="card-title">Security</h3></div>
+      <div class="card-body">
+        <div class="info-row">
+          <div><div class="info-label">Password</div><div class="info-value">••••••••</div></div>
+          <button class="btn-secondary" onclick="alert('Password change feature aane wala hai (Milestone 2)')">Change</button>
+        </div>
+        <div class="info-row">
+          <div><div class="info-label">Two-Factor Authentication</div><div class="info-value">Disabled</div></div>
+          <button class="btn-secondary" onclick="alert('2FA setup feature aane wala hai (Milestone 2)')">Enable</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>

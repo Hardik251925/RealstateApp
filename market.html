@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Market — PropTrade</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="siteHeader"></div>
+
+<main class="main">
+  <section class="market-banner">
+    <div class="market-banner-inner">
+      <div class="banner-left">
+        <h1 class="market-h1">Property Market <span class="live-badge"><span class="live-dot"></span> LIVE</span></h1>
+        <p class="market-sub">India's first share-market style real estate trading. Buy/sell properties in real-time.</p>
+      </div>
+      <div class="banner-stats">
+        <div class="bs-item"><div class="bs-label">Total Listed</div><div class="bs-value" id="statTotal">—</div></div>
+        <div class="bs-item"><div class="bs-label">24h Volume</div><div class="bs-value">₹42.6 Cr</div></div>
+        <div class="bs-item"><div class="bs-label">Active Traders</div><div class="bs-value">12,485</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="movers-section">
+    <div class="movers-grid" id="moversGrid"></div>
+  </section>
+
+  <section class="market-controls">
+    <div class="search-wrap">
+      <input type="text" id="searchInput" class="search-input" placeholder="Search by name, location, category...">
+      <div id="searchResults" class="search-results"></div>
+    </div>
+    <div class="filter-tabs" id="filterTabs"></div>
+    <select id="sortSelect" class="sort-select">
+      <option value="default">Sort: Default</option>
+      <option value="gainers">Top Gainers</option>
+      <option value="losers">Top Losers</option>
+      <option value="price_high">Price High to Low</option>
+      <option value="price_low">Price Low to High</option>
+    </select>
+    <div class="view-toggle">
+      <button class="vt-btn active" data-view="cards" title="Card view">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </button>
+      <button class="vt-btn" data-view="table" title="Table view">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    </div>
+  </section>
+
+  <section id="propCards" class="prop-cards-grid"></section>
+  <section id="propTable" class="market-table-wrap" style="display:none;"></section>
+</main>
+
+<script src="js/data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/main.js"></script>
+<script>
+const user = requireAuth();
+if (user) {
+  renderHeader('market');
+  initSearch();
+
+  // URL params for filter/sort
+  const params = new URLSearchParams(location.search);
+  let activeCat = params.get('cat') || 'all';
+  let activeSort = params.get('sort') || 'default';
+
+  // Filter tabs
+  const cats = ['all','residential','commercial','land','fractional'];
+  const labels = {all:'All',residential:'Residential',commercial:'Commercial',land:'Land',fractional:'Fractional'};
+  document.getElementById('filterTabs').innerHTML = cats.map(c =>
+    `<a href="?cat=${c}&sort=${activeSort}" class="ftab ${activeCat===c?'active':''}">${labels[c]}</a>`
+  ).join('');
+
+  // Sort select
+  const sortSel = document.getElementById('sortSelect');
+  sortSel.value = activeSort;
+  sortSel.addEventListener('change', () => {
+    location.search = `?cat=${activeCat}&sort=${sortSel.value}`;
+  });
+
+  // Filter properties
+  let list = activeCat === 'all' ? [...PROPERTIES] : PROPERTIES.filter(p => p.category.toLowerCase() === activeCat);
+
+  if (activeSort === 'gainers') list.sort((a,b)=>b.change_pct-a.change_pct);
+  else if (activeSort === 'losers') list.sort((a,b)=>a.change_pct-b.change_pct);
+  else if (activeSort === 'price_high') list.sort((a,b)=>b.price-a.price);
+  else if (activeSort === 'price_low') list.sort((a,b)=>a.price-b.price);
+
+  document.getElementById('statTotal').textContent = list.length;
+
+  // Movers
+  const topG = [...PROPERTIES].sort((a,b)=>b.change_pct-a.change_pct).slice(0,3);
+  const topL = [...PROPERTIES].sort((a,b)=>a.change_pct-b.change_pct).slice(0,3);
+
+  function moverRow(p, cls) {
+    return `
+      <a href="property.html?id=${p.id}" class="mover-row">
+        <div class="mover-info">
+          <div class="mover-symbol">${p.symbol}</div>
+          <div class="mover-name">${p.name}</div>
+        </div>
+        <div class="mover-price">
+          <div class="mp-value">${formatINR(p.price)}</div>
+          <div class="mp-change ${cls}">${cls==='green'?'+':''}${p.change_pct.toFixed(2)}%</div>
+        </div>
+      </a>
+    `;
+  }
+
+  document.getElementById('moversGrid').innerHTML = `
+    <div class="movers-card">
+      <div class="movers-head"><span class="movers-icon green">↑</span><span class="movers-title">Top Gainers</span></div>
+      ${topG.map(p=>moverRow(p,'green')).join('')}
+    </div>
+    <div class="movers-card">
+      <div class="movers-head"><span class="movers-icon red">↓</span><span class="movers-title">Top Losers</span></div>
+      ${topL.map(p=>moverRow(p,'red')).join('')}
+    </div>
+    <div class="movers-card insight-card">
+      <div class="movers-head"><span class="movers-icon yellow">★</span><span class="movers-title">Market Insight</span></div>
+      <div class="insight-body">
+        <p class="insight-text">Commercial properties in <strong>BKC & Cyber City</strong> are seeing 2.5%+ daily moves due to high institutional demand. Retail tokens at <strong>₹1,000-2,500</strong> remain most accessible for new investors.</p>
+        <div class="insight-tags"><span class="tag">#Commercial</span><span class="tag">#Fractional</span><span class="tag">#Trending</span></div>
+      </div>
+    </div>
+  `;
+
+  const watchlist = Store.getWatchlist(user.id);
+
+  // Cards
+  const cardsHTML = list.map(p => {
+    const isUp = p.change_pct >= 0;
+    return `
+    <article class="prop-card">
+      <div class="pc-image cat-grad-${p.category.toLowerCase()}">
+        <button class="star-btn pc-star ${watchlist.includes(p.id)?'active':''}" data-prop-id="${p.id}" onclick="event.preventDefault();event.stopPropagation();toggleWatchlistBtn(this,'${p.id}')">★</button>
+        <span class="pc-cat">${p.category}</span>
+        <div class="pc-img-content">
+          <div class="pc-img-symbol">${p.symbol}</div>
+          <div class="pc-img-change ${isUp?'green':'red'}">${isUp?'▲ +':'▼ '}${p.change_pct.toFixed(2)}%</div>
+        </div>
+      </div>
+      <div class="pc-body">
+        <h3 class="pc-name">${p.name}</h3>
+        <div class="pc-loc">📍 ${p.location}</div>
+        <div class="pc-stats-row">
+          <div class="pc-stat"><div class="pc-stat-label">Price / Unit</div><div class="pc-stat-value">${formatINR(p.price,0)}</div></div>
+          <div class="pc-stat"><div class="pc-stat-label">ROI</div><div class="pc-stat-value green">${p.roi}%</div></div>
+          <div class="pc-stat"><div class="pc-stat-label">${p.bhk}</div><div class="pc-stat-value">${p.area} sqft</div></div>
+        </div>
+        <div class="pc-meta">
+          <span class="pc-meta-item">📊 Vol ${p.volume}</span>
+          <span class="pc-meta-item">🏛 ${p.status}</span>
+        </div>
+        <div class="pc-actions">
+          <a href="property.html?id=${p.id}" class="pc-btn-trade">Trade Now</a>
+          <a href="property.html?id=${p.id}" class="pc-btn-secondary">Details</a>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+
+  document.getElementById('propCards').innerHTML = cardsHTML || `
+    <div class="empty-state" style="grid-column:1/-1;">
+      <div class="empty-icon">🔍</div>
+      <h3>No properties found</h3>
+      <p>Is category mein abhi koi listing nahi hai</p>
+    </div>`;
+
+  // Table
+  document.getElementById('propTable').innerHTML = `
+    <table class="market-table">
+      <thead>
+        <tr>
+          <th class="col-star"></th>
+          <th>Property / Location</th>
+          <th class="num">Price (per unit)</th>
+          <th class="num">24h Change</th>
+          <th class="num hide-md">Volume</th>
+          <th class="num hide-md">ROI</th>
+          <th class="hide-sm">Category</th>
+          <th class="num">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${list.map(p => {
+          const isUp = p.change_pct >= 0;
+          return `<tr class="market-row">
+            <td class="col-star"><button class="star-btn ${watchlist.includes(p.id)?'active':''}" data-prop-id="${p.id}" onclick="toggleWatchlistBtn(this,'${p.id}')">★</button></td>
+            <td><a href="property.html?id=${p.id}" class="prop-cell">
+              <div class="prop-symbol">${p.symbol}</div>
+              <div class="prop-text"><div class="prop-name">${p.name}</div><div class="prop-loc">${p.location}</div></div>
+            </a></td>
+            <td class="num"><div class="price-main">${formatINR(p.price)}</div><div class="price-sub">${p.area} sq ft</div></td>
+            <td class="num">
+              <div class="change-pill ${isUp?'green':'red'}"><span class="ch-arrow">${isUp?'▲':'▼'}</span><span>${isUp?'+':''}${p.change_pct.toFixed(2)}%</span></div>
+              <div class="change-sub ${isUp?'green':'red'}">${isUp?'+':''}${formatINR(p.change)}</div>
+            </td>
+            <td class="num hide-md">${p.volume}</td>
+            <td class="num hide-md"><span class="roi-pill">${p.roi}%</span></td>
+            <td class="hide-sm"><span class="cat-tag cat-${p.category.toLowerCase()}">${p.category}</span></td>
+            <td class="num"><a href="property.html?id=${p.id}" class="btn-trade">Trade</a></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    ${list.length === 0 ? '<div class="empty-state">No properties found in this category.</div>' : ''}
+  `;
+
+  initViewToggle();
+}
+</script>
+</body>
+</html>

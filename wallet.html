@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wallet — PropTrade</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="siteHeader"></div>
+<main class="main">
+  <div class="page-head">
+    <h1 class="page-h1">Wallet</h1>
+    <p class="page-sub">Funds add/withdraw karo aur transactions track karo</p>
+  </div>
+  <div id="walletContent"></div>
+</main>
+
+<script src="js/data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/main.js"></script>
+<script>
+const user = requireAuth();
+if (user) {
+  renderHeader('wallet');
+  render();
+}
+
+function render() {
+  const u = Store.getCurrentUser();
+  const txns = Store.getTxns(u.id).slice(0, 30);
+
+  document.getElementById('walletContent').innerHTML = `
+    <div class="wallet-grid">
+      <div class="wallet-balance-card">
+        <div class="wb-label">Available Balance</div>
+        <div class="wb-amount">${formatINR(u.wallet_balance)}</div>
+        <div class="wb-meta"><span>Last updated: just now</span></div>
+      </div>
+
+      <div class="card wallet-action-card">
+        <div class="card-head">
+          <h3 class="card-title">Add / Withdraw Funds</h3>
+          <span class="card-sub">Demo mode — instant credit</span>
+        </div>
+        <div class="card-body">
+          <div class="wa-tabs">
+            <button class="wa-tab active" data-action="deposit">Deposit</button>
+            <button class="wa-tab" data-action="withdraw">Withdraw</button>
+          </div>
+          <form id="walletForm" class="auth-form">
+            <div class="form-group">
+              <label>Amount (₹)</label>
+              <input type="number" name="amount" placeholder="10000" min="1" step="0.01" required>
+            </div>
+            <div class="quick-amounts">
+              <button type="button" class="qa-btn" onclick="setAmount(1000)">₹1,000</button>
+              <button type="button" class="qa-btn" onclick="setAmount(10000)">₹10,000</button>
+              <button type="button" class="qa-btn" onclick="setAmount(50000)">₹50,000</button>
+              <button type="button" class="qa-btn" onclick="setAmount(100000)">₹1 Lakh</button>
+            </div>
+            <div class="payment-methods">
+              <div class="pm-label">Payment Method</div>
+              <div class="pm-grid">
+                <label class="pm-option active"><input type="radio" name="pm" checked><span class="pm-icon">UPI</span><span class="pm-name">UPI / GPay</span></label>
+                <label class="pm-option"><input type="radio" name="pm"><span class="pm-icon">NB</span><span class="pm-name">Net Banking</span></label>
+                <label class="pm-option"><input type="radio" name="pm"><span class="pm-icon">CC</span><span class="pm-name">Card</span></label>
+              </div>
+            </div>
+            <button type="submit" class="btn-primary btn-full" id="submitBtn">Deposit Funds</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3 class="card-title">Recent Transactions</h3>
+        <span class="card-sub">Last 30 entries</span>
+      </div>
+      ${txns.length === 0 ? `
+        <div class="empty-state"><div class="empty-icon">💳</div><h3>No transactions yet</h3></div>
+      ` : `
+        <table class="market-table">
+          <thead><tr><th>Date</th><th>Description</th><th>Type</th><th class="num">Amount</th></tr></thead>
+          <tbody>
+            ${txns.map(t => `
+              <tr class="market-row">
+                <td><div class="date-cell">${t.created_at.slice(0,10)}</div><div class="time-cell">${t.created_at.slice(11,16)}</div></td>
+                <td>${escapeHTML(t.description)}</td>
+                <td><span class="side-pill ${t.txn_type==='CREDIT'?'green':'red'}">${t.txn_type}</span></td>
+                <td class="num"><strong class="${t.txn_type==='CREDIT'?'green':'red'}">${t.txn_type==='CREDIT'?'+':'-'}${formatINR(t.amount)}</strong></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `}
+    </div>
+  `;
+
+  let action = 'deposit';
+  document.querySelectorAll('.wa-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.wa-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      action = tab.dataset.action;
+      document.getElementById('submitBtn').textContent = action === 'deposit' ? 'Deposit Funds' : 'Withdraw Funds';
+    });
+  });
+
+  document.querySelectorAll('.pm-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      document.querySelectorAll('.pm-option').forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+    });
+  });
+
+  document.getElementById('walletForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const amount = parseFloat(new FormData(e.target).get('amount'));
+    const result = action === 'deposit' ? Store.deposit(u.id, amount) : Store.withdraw(u.id, amount);
+    if (result.ok) {
+      toast(result.msg, 'success');
+      setTimeout(() => location.reload(), 800);
+    } else {
+      toast(result.msg, 'error');
+    }
+  });
+}
+
+function setAmount(amt) {
+  document.querySelector('input[name="amount"]').value = amt;
+}
+</script>
+</body>
+</html>

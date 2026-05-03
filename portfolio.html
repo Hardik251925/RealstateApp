@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio — PropTrade</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="siteHeader"></div>
+
+<main class="main">
+  <div class="page-head">
+    <h1 class="page-h1">My Portfolio</h1>
+    <p class="page-sub">Aapki saari investments aur live P&L</p>
+  </div>
+  <div id="portContent"></div>
+</main>
+
+<script src="js/data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/main.js"></script>
+<script>
+const user = requireAuth();
+if (user) {
+  renderHeader('portfolio');
+
+  const holdingsRaw = Store.getHoldings(user.id);
+  let totalInvested = 0, totalCurrent = 0;
+  const holdings = holdingsRaw.map(h => {
+    const prop = findProperty(h.property_id);
+    if (!prop) return null;
+    const invested = h.avg_buy_price * h.units;
+    const current = prop.price * h.units;
+    const pnl = current - invested;
+    const pnl_pct = invested > 0 ? (pnl / invested * 100) : 0;
+    totalInvested += invested;
+    totalCurrent += current;
+    return { prop, units: h.units, avg_price: h.avg_buy_price, invested, current_value: current, pnl, pnl_pct };
+  }).filter(Boolean);
+
+  const totalPnl = totalCurrent - totalInvested;
+  const totalPnlPct = totalInvested > 0 ? (totalPnl / totalInvested * 100) : 0;
+
+  document.getElementById('portContent').innerHTML = `
+    <div class="port-summary">
+      <div class="ps-card primary-card">
+        <div class="ps-label">Current Value</div>
+        <div class="ps-value">${formatINR(totalCurrent)}</div>
+        <div class="ps-sub">Total invested: ${formatINR(totalInvested)}</div>
+      </div>
+      <div class="ps-card">
+        <div class="ps-label">Total P&L</div>
+        <div class="ps-value ${totalPnl>=0?'green':'red'}">${totalPnl>=0?'+':''}${formatINR(totalPnl)}</div>
+        <div class="ps-sub ${totalPnl>=0?'green':'red'}">${totalPnl>=0?'+':''}${totalPnlPct.toFixed(2)}% overall return</div>
+      </div>
+      <div class="ps-card">
+        <div class="ps-label">Holdings</div>
+        <div class="ps-value">${holdings.length}</div>
+        <div class="ps-sub">Properties in portfolio</div>
+      </div>
+      <div class="ps-card">
+        <div class="ps-label">Available Balance</div>
+        <div class="ps-value">${formatINR(user.wallet_balance)}</div>
+        <div class="ps-sub"><a href="wallet.html" class="link">Manage wallet →</a></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3 class="card-title">My Holdings</h3>
+        <span class="card-sub">${holdings.length} ${holdings.length === 1 ? 'property' : 'properties'}</span>
+      </div>
+      ${holdings.length === 0 ? `
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <h3>No holdings yet</h3>
+          <p>Apni first property buy karo aur portfolio start karo</p>
+          <a href="market.html" class="btn-primary">Browse Market</a>
+        </div>
+      ` : `
+        <table class="market-table">
+          <thead>
+            <tr>
+              <th>Property</th>
+              <th class="num">Units</th>
+              <th class="num">Avg Price</th>
+              <th class="num">LTP</th>
+              <th class="num hide-md">Invested</th>
+              <th class="num">Current Value</th>
+              <th class="num">P&L</th>
+              <th class="num">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${holdings.map(h => `
+              <tr class="market-row">
+                <td><a href="property.html?id=${h.prop.id}" class="prop-cell">
+                  <div class="prop-symbol">${h.prop.symbol}</div>
+                  <div class="prop-text"><div class="prop-name">${h.prop.name}</div><div class="prop-loc">${h.prop.location}</div></div>
+                </a></td>
+                <td class="num">${h.units.toFixed(2)}</td>
+                <td class="num">${formatINR(h.avg_price)}</td>
+                <td class="num">${formatINR(h.prop.price)}</td>
+                <td class="num hide-md">${formatINR(h.invested)}</td>
+                <td class="num"><strong>${formatINR(h.current_value)}</strong></td>
+                <td class="num">
+                  <div class="change-pill ${h.pnl>=0?'green':'red'}">${h.pnl>=0?'+':''}${formatINR(h.pnl)}</div>
+                  <div class="change-sub ${h.pnl>=0?'green':'red'}">${h.pnl>=0?'+':''}${h.pnl_pct.toFixed(2)}%</div>
+                </td>
+                <td class="num"><a href="property.html?id=${h.prop.id}" class="btn-trade">Trade</a></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `}
+    </div>
+  `;
+}
+</script>
+</body>
+</html>

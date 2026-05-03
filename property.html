@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Property Detail — PropTrade</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.0/dist/chartjs-chart-financial.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body>
+<div id="siteHeader"></div>
+
+<main class="main">
+  <div id="pdContent"></div>
+</main>
+
+<script src="js/data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/main.js"></script>
+<script>
+const user = requireAuth();
+if (user) {
+  renderHeader('market');
+
+  const propId = new URLSearchParams(location.search).get('id');
+  const prop = findProperty(propId);
+
+  if (!prop) {
+    document.getElementById('pdContent').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <h3>Property nahi mili</h3>
+        <a href="market.html" class="btn-primary">Back to Market</a>
+      </div>`;
+  } else {
+    renderPropertyDetail(prop, user);
+  }
+}
+
+function renderPropertyDetail(prop, user) {
+  const isUp = prop.change_pct >= 0;
+  const orderBook = generateOrderBook(prop);
+  const holding = Store.getHolding(user.id, prop.id);
+  const inWatchlist = Store.getWatchlist(user.id).includes(prop.id);
+
+  document.getElementById('pdContent').innerHTML = `
+    <div class="pd-page">
+      <div class="breadcrumb">
+        <a href="market.html">Market</a>
+        <span class="bc-sep">/</span>
+        <span>${prop.category}</span>
+        <span class="bc-sep">/</span>
+        <span class="bc-current">${prop.symbol}</span>
+      </div>
+
+      <div class="pd-header">
+        <div class="pd-head-left">
+          <div class="pd-symbol-block">
+            <div class="pd-symbol">${prop.symbol}</div>
+            <button class="star-btn-lg ${inWatchlist?'active':''}" id="starBtn" onclick="toggleWatchlistBtn(this,'${prop.id}')">★</button>
+          </div>
+          <div>
+            <h1 class="pd-name">${prop.name}</h1>
+            <div class="pd-loc">📍 ${prop.location} · <span class="cat-tag cat-${prop.category.toLowerCase()}">${prop.category}</span></div>
+          </div>
+        </div>
+        <div class="pd-head-right">
+          <div class="pd-price">${formatINR(prop.price)}</div>
+          <div class="pd-change ${isUp?'green':'red'}">
+            <span>${isUp?'▲ +':'▼ '}${formatINR(Math.abs(prop.change))}</span>
+            <span class="pd-pct">${isUp?'+':''}${prop.change_pct.toFixed(2)}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pd-stats">
+        <div class="pd-stat"><div class="pds-label">Market Cap</div><div class="pds-value">${prop.market_cap}</div></div>
+        <div class="pd-stat"><div class="pds-label">24h Volume</div><div class="pds-value">${prop.volume}</div></div>
+        <div class="pd-stat"><div class="pds-label">Area</div><div class="pds-value">${prop.area} sq ft</div></div>
+        <div class="pd-stat"><div class="pds-label">Type</div><div class="pds-value">${prop.bhk}</div></div>
+        <div class="pd-stat"><div class="pds-label">Annual ROI</div><div class="pds-value green">${prop.roi}%</div></div>
+        <div class="pd-stat"><div class="pds-label">Status</div><div class="pds-value">${prop.status}</div></div>
+      </div>
+
+      <div class="pd-grid">
+        <div class="pd-main">
+          <div class="card">
+            <div class="card-head">
+              <div class="card-head-left">
+                <h3 class="card-title">Price Chart</h3>
+                <div class="chart-types">
+                  <button class="ct-btn active" data-type="line">Line</button>
+                  <button class="ct-btn" data-type="candlestick">Candle</button>
+                </div>
+              </div>
+              <div class="chart-ranges">
+                <button class="cr-btn" data-range="7">7D</button>
+                <button class="cr-btn" data-range="30">1M</button>
+                <button class="cr-btn active" data-range="90">3M</button>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="priceChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h3 class="card-title">Order Book</h3>
+              <span class="card-sub">Live buy/sell orders</span>
+            </div>
+            <div class="ob-grid">
+              <div class="ob-side">
+                <div class="ob-head ob-head-bid"><span>Price (₹)</span><span>Quantity</span><span>Total</span></div>
+                ${orderBook.bids.map(b => `
+                  <div class="ob-row ob-row-bid">
+                    <span class="ob-price green">${b.price.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+                    <span>${b.qty}</span>
+                    <span>${formatINR(b.total,0)}</span>
+                  </div>
+                `).join('')}
+              </div>
+              <div class="ob-side">
+                <div class="ob-head ob-head-ask"><span>Price (₹)</span><span>Quantity</span><span>Total</span></div>
+                ${orderBook.asks.map(a => `
+                  <div class="ob-row ob-row-ask">
+                    <span class="ob-price red">${a.price.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+                    <span>${a.qty}</span>
+                    <span>${formatINR(a.total,0)}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3 class="card-title">About this Property</h3></div>
+            <div class="card-body">
+              <p class="pd-desc">${escapeHTML(prop.description)}</p>
+              <h4 class="sub-title">Amenities</h4>
+              <div class="amen-list">
+                ${prop.amenities.map(a => `<span class="amen-pill">${escapeHTML(a)}</span>`).join('')}
+              </div>
+              <h4 class="sub-title">Legal</h4>
+              <div class="legal-grid">
+                <div class="legal-item">
+                  <div class="li-label">RERA Number</div>
+                  <div class="li-value">${escapeHTML(prop.rera)}</div>
+                </div>
+                <div class="legal-item">
+                  <div class="li-label">Status</div>
+                  <div class="li-value">${escapeHTML(prop.status)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="pd-side">
+          <div class="card trade-card sticky">
+            <div class="trade-tabs">
+              <button class="tt-btn active green-tab" data-side="BUY" id="tabBuy">BUY</button>
+              <button class="tt-btn red-tab" data-side="SELL" id="tabSell">SELL</button>
+            </div>
+            <div class="trade-body">
+              <div class="ot-row">
+                <button class="ot-btn active" data-otype="MARKET">Market</button>
+                <button class="ot-btn" data-otype="LIMIT">Limit</button>
+              </div>
+              <div class="form-group" id="limitGroup" style="display:none;">
+                <label>Limit Price (₹)</label>
+                <input type="number" id="limitPrice" step="0.01" placeholder="${prop.price.toFixed(2)}">
+              </div>
+              <div class="form-group">
+                <label>Quantity (units / sq ft)</label>
+                <input type="number" id="units" step="0.01" placeholder="0.00" min="0.01">
+                <div class="quick-amounts">
+                  <button class="qa-btn" data-amt="25">25%</button>
+                  <button class="qa-btn" data-amt="50">50%</button>
+                  <button class="qa-btn" data-amt="75">75%</button>
+                  <button class="qa-btn" data-amt="100">Max</button>
+                </div>
+              </div>
+              <div class="trade-summary">
+                <div class="ts-row"><span>Price per unit</span><span id="priceDisplay">${formatINR(prop.price)}</span></div>
+                <div class="ts-row"><span>Brokerage (0.5%)</span><span id="brokerage">₹0.00</span></div>
+                <div class="ts-row total"><span>Total Required</span><span id="totalAmount">₹0.00</span></div>
+              </div>
+              ${holding ? `
+                <div class="holding-info">
+                  <div class="hi-label">You hold</div>
+                  <div class="hi-value">${holding.units.toFixed(2)} units @ ${formatINR(holding.avg_buy_price)}</div>
+                </div>
+              ` : ''}
+              <button class="btn-trade-action btn-buy" id="actionBtn">Buy ${prop.symbol}</button>
+              <div class="trade-balance">
+                Available: <strong>${formatINR(user.wallet_balance)}</strong>
+                <a href="wallet.html" class="add-funds">+ Add Funds</a>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  `;
+
+  // Chart
+  const history = generatePriceHistory(prop, 90);
+  let chartInstance = null;
+
+  function drawChart(type, rangeDays) {
+    let data = history;
+    if (rangeDays > 0 && history.length > rangeDays) data = history.slice(-rangeDays);
+    const isUp = data.length > 1 && data[data.length-1].close >= data[0].close;
+    const lineColor = isUp ? '#00d09c' : '#ff4d6d';
+    const fillColor = isUp ? 'rgba(0, 208, 156, 0.15)' : 'rgba(255, 77, 109, 0.15)';
+    const ctx = document.getElementById('priceChart');
+    if (chartInstance) chartInstance.destroy();
+
+    if (type === 'candlestick') {
+      chartInstance = new Chart(ctx, {
+        type: 'candlestick',
+        data: { datasets: [{
+          label: 'Price',
+          data: data.map(d => ({ x: new Date(d.date).getTime(), o:d.open, h:d.high, l:d.low, c:d.close })),
+          color: { up:'#00d09c', down:'#ff4d6d', unchanged:'#a3b1c2' },
+          borderColor: { up:'#00d09c', down:'#ff4d6d', unchanged:'#a3b1c2' }
+        }]},
+        options: chartOpts(true)
+      });
+    } else {
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.map(d => d.date),
+          datasets: [{
+            label: 'Price (₹)',
+            data: data.map(d => d.close),
+            borderColor: lineColor, backgroundColor: fillColor, fill: true,
+            tension: 0.3, pointRadius: 0, pointHoverRadius: 5,
+            pointHoverBackgroundColor: lineColor, pointHoverBorderColor: '#fff', pointHoverBorderWidth: 2,
+            borderWidth: 2,
+          }]
+        },
+        options: chartOpts(false)
+      });
+    }
+  }
+
+  function chartOpts(isCandle) {
+    return {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(26, 34, 48, 0.98)', titleColor: '#fff', bodyColor: '#a3b1c2',
+          borderColor: 'rgba(255,255,255,0.12)', borderWidth: 1, padding: 12, cornerRadius: 8,
+          displayColors: false,
+          callbacks: {
+            label: function(ctx) {
+              if (isCandle) {
+                const d = ctx.raw;
+                return ['Open: '+formatINR(d.o),'High: '+formatINR(d.h),'Low: '+formatINR(d.l),'Close: '+formatINR(d.c)];
+              }
+              return formatINR(ctx.parsed.y);
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: isCandle ? 'time' : 'category',
+          time: isCandle ? { unit: 'day', tooltipFormat: 'dd MMM yyyy' } : undefined,
+          grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+          ticks: { color: '#6b7a90', font: { size: 11, family: 'JetBrains Mono' }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }
+        },
+        y: {
+          position: 'right',
+          grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+          ticks: {
+            color: '#6b7a90', font: { size: 11, family: 'JetBrains Mono' },
+            callback: function(val) { return '₹' + Number(val).toLocaleString('en-IN',{maximumFractionDigits:0}); }
+          }
+        }
+      }
+    };
+  }
+
+  drawChart('line', 90);
+
+  document.querySelectorAll('.ct-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.ct-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const r = parseInt(document.querySelector('.cr-btn.active').dataset.range);
+      drawChart(btn.dataset.type, r);
+    });
+  });
+  document.querySelectorAll('.cr-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cr-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const t = document.querySelector('.ct-btn.active').dataset.type;
+      drawChart(t, parseInt(btn.dataset.range));
+    });
+  });
+
+  // Trade panel logic
+  let currentSide = 'BUY';
+  let currentOrderType = 'MARKET';
+  const tabBuy = document.getElementById('tabBuy');
+  const tabSell = document.getElementById('tabSell');
+  const actionBtn = document.getElementById('actionBtn');
+  const unitsInput = document.getElementById('units');
+  const limitPriceInput = document.getElementById('limitPrice');
+  const limitGroup = document.getElementById('limitGroup');
+  const totalAmount = document.getElementById('totalAmount');
+  const brokerage = document.getElementById('brokerage');
+  const priceDisplay = document.getElementById('priceDisplay');
+
+  function recalc() {
+    const units = parseFloat(unitsInput.value) || 0;
+    const price = currentOrderType === 'LIMIT' && limitPriceInput.value
+      ? parseFloat(limitPriceInput.value) : prop.price;
+    const subtotal = units * price;
+    const fee = subtotal * 0.005;
+    const total = subtotal + (currentSide === 'BUY' ? fee : -fee);
+    priceDisplay.textContent = formatINR(price);
+    brokerage.textContent = formatINR(fee);
+    totalAmount.textContent = formatINR(Math.max(0, total));
+  }
+
+  function updateUI() {
+    if (currentSide === 'BUY') {
+      tabBuy.classList.add('active'); tabSell.classList.remove('active');
+      actionBtn.textContent = 'Buy ' + prop.symbol;
+      actionBtn.classList.remove('btn-sell'); actionBtn.classList.add('btn-buy');
+    } else {
+      tabSell.classList.add('active'); tabBuy.classList.remove('active');
+      actionBtn.textContent = 'Sell ' + prop.symbol;
+      actionBtn.classList.remove('btn-buy'); actionBtn.classList.add('btn-sell');
+    }
+    recalc();
+  }
+
+  tabBuy.addEventListener('click', () => { currentSide = 'BUY'; updateUI(); });
+  tabSell.addEventListener('click', () => { currentSide = 'SELL'; updateUI(); });
+
+  document.querySelectorAll('.ot-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.ot-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentOrderType = btn.dataset.otype;
+      limitGroup.style.display = currentOrderType === 'LIMIT' ? 'flex' : 'none';
+      recalc();
+    });
+  });
+
+  [unitsInput, limitPriceInput].forEach(inp => {
+    if (inp) inp.addEventListener('input', recalc);
+  });
+
+  document.querySelectorAll('.quick-amounts .qa-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pct = parseInt(btn.dataset.amt);
+      const u = Store.getCurrentUser();
+      const balance = u ? u.wallet_balance : 0;
+      const price = currentOrderType === 'LIMIT' && limitPriceInput.value
+        ? parseFloat(limitPriceInput.value) : prop.price;
+      if (currentSide === 'BUY') {
+        unitsInput.value = ((balance * pct / 100) / price).toFixed(4);
+      } else {
+        const h = Store.getHolding(u.id, prop.id);
+        if (h) unitsInput.value = (h.units * pct / 100).toFixed(4);
+      }
+      recalc();
+    });
+  });
+
+  actionBtn.addEventListener('click', () => {
+    const units = parseFloat(unitsInput.value);
+    if (!units || units <= 0) { toast('Pehle units enter karo', 'error'); return; }
+    actionBtn.disabled = true;
+    const original = actionBtn.textContent;
+    actionBtn.textContent = 'Processing...';
+
+    setTimeout(() => {
+      const u = Store.getCurrentUser();
+      const result = currentSide === 'BUY'
+        ? Store.buy(u.id, prop.id, units, currentOrderType, limitPriceInput.value)
+        : Store.sell(u.id, prop.id, units, currentOrderType, limitPriceInput.value);
+
+      if (result.ok) {
+        toast(result.msg, 'success');
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        toast(result.msg, 'error');
+        actionBtn.disabled = false;
+        actionBtn.textContent = original;
+      }
+    }, 400);
+  });
+
+  updateUI();
+}
+</script>
+</body>
+</html>

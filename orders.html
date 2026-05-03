@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orders — PropTrade</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="siteHeader"></div>
+<main class="main">
+  <div class="page-head">
+    <h1 class="page-h1">Order History</h1>
+    <p class="page-sub">Aapki saari buy/sell transactions</p>
+  </div>
+  <div id="ordersContent"></div>
+</main>
+
+<script src="js/data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/main.js"></script>
+<script>
+const user = requireAuth();
+if (user) {
+  renderHeader('orders');
+  const orders = Store.getOrders(user.id);
+  document.getElementById('ordersContent').innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <h3 class="card-title">All Orders</h3>
+        <span class="card-sub">${orders.length} total</span>
+      </div>
+      ${orders.length === 0 ? `
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <h3>No orders yet</h3>
+          <p>Apni first trade place karo</p>
+          <a href="market.html" class="btn-primary">Start Trading</a>
+        </div>
+      ` : `
+        <table class="market-table">
+          <thead>
+            <tr>
+              <th>Date & Time</th><th>Property</th><th>Side</th><th>Type</th>
+              <th class="num">Units</th><th class="num">Price</th><th class="num">Total</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${orders.map(o => {
+              const p = findProperty(o.property_id);
+              return `<tr class="market-row">
+                <td><div class="date-cell">${o.created_at.slice(0,10)}</div><div class="time-cell">${o.created_at.slice(11,16)}</div></td>
+                <td>${p ? `<a href="property.html?id=${p.id}" class="prop-cell">
+                  <div class="prop-symbol">${p.symbol}</div>
+                  <div class="prop-text"><div class="prop-name">${p.name}</div><div class="prop-loc">${p.location}</div></div>
+                </a>` : o.property_id}</td>
+                <td><span class="side-pill ${o.side==='BUY'?'green':'red'}">${o.side}</span></td>
+                <td><span class="type-pill">${o.order_type}</span></td>
+                <td class="num">${o.units.toFixed(2)}</td>
+                <td class="num">${formatINR(o.price)}</td>
+                <td class="num"><strong>${formatINR(o.total)}</strong></td>
+                <td><span class="status-pill executed">${o.status}</span></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      `}
+    </div>
+  `;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Watchlist — PropTrade</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="siteHeader"></div>
+<main class="main">
+  <div class="page-head">
+    <h1 class="page-h1">My Watchlist</h1>
+    <p class="page-sub">Tracked properties with live price movement</p>
+  </div>
+  <div id="wlContent"></div>
+</main>
+
+<script src="js/data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/main.js"></script>
+<script>
+const user = requireAuth();
+if (user) {
+  renderHeader('watchlist');
+  const ids = Store.getWatchlist(user.id);
+  const properties = PROPERTIES.filter(p => ids.includes(p.id));
+
+  document.getElementById('wlContent').innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <h3 class="card-title">Watching</h3>
+        <span class="card-sub">${properties.length} ${properties.length === 1 ? 'property' : 'properties'}</span>
+      </div>
+      ${properties.length === 0 ? `
+        <div class="empty-state">
+          <div class="empty-icon">⭐</div>
+          <h3>Watchlist is empty</h3>
+          <p>Properties ko star karo market screen pe taaki yahan track kar sako</p>
+          <a href="market.html" class="btn-primary">Browse Market</a>
+        </div>
+      ` : `
+        <table class="market-table">
+          <thead>
+            <tr>
+              <th class="col-star"></th>
+              <th>Property / Location</th>
+              <th class="num">Price</th>
+              <th class="num">24h Change</th>
+              <th class="hide-sm">Category</th>
+              <th class="num">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${properties.map(p => `
+              <tr class="market-row">
+                <td class="col-star"><button class="star-btn active" data-prop-id="${p.id}" onclick="toggleWatchlistBtn(this,'${p.id}'); setTimeout(()=>location.reload(),500)">★</button></td>
+                <td><a href="property.html?id=${p.id}" class="prop-cell">
+                  <div class="prop-symbol">${p.symbol}</div>
+                  <div class="prop-text"><div class="prop-name">${p.name}</div><div class="prop-loc">${p.location}</div></div>
+                </a></td>
+                <td class="num"><div class="price-main">${formatINR(p.price)}</div></td>
+                <td class="num"><div class="change-pill ${p.change_pct>=0?'green':'red'}">${p.change_pct>=0?'▲ +':'▼ '}${p.change_pct.toFixed(2)}%</div></td>
+                <td class="hide-sm"><span class="cat-tag cat-${p.category.toLowerCase()}">${p.category}</span></td>
+                <td class="num"><a href="property.html?id=${p.id}" class="btn-trade">Trade</a></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `}
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
